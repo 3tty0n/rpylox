@@ -1,7 +1,7 @@
 from lox.compiler import Compiler
 from lox.opcode import OpCode
 from lox.debug import disassemble_instruction, format_line_number
-from lox.value import W_Number, W_Bool, W_Nil
+from lox.value import W_Number, W_Bool, W_Nil, W_Obj
 
 class InterpretResult:
     INTERPRET_OK = 0
@@ -131,7 +131,13 @@ class VM(object):
         if op == "+":
             w_y = self._pop_stack()
             w_x = self._pop_stack()
-            self._push_stack(w_x.add(w_y))
+            if w_x.is_string() and w_y.is_string():
+                self._concatinate(w_x, w_y)
+            elif w_x.is_number() and w_y.is_number():
+                self._push_stack(w_x.add(w_y))
+            else:
+                self._runtime_error("Operands must be two numbers or two strings.")
+                return InterpretResult.INTERPRET_RUNTIME_ERROR
         elif op == "-":
             w_y = self._pop_stack()
             w_x = self._pop_stack()
@@ -159,3 +165,9 @@ class VM(object):
             w_x = self._pop_stack()
             w_z = W_Bool(w_x.as_number() == w_y.as_number())
             self._push_stack(w_z)
+
+    def _concatinate(self, w_x, w_y):
+        obj_str1 = w_x.get_value()
+        obj_str2 = w_y.get_value()
+        w_z = W_Obj(obj_str1.concat(obj_str2))
+        self._push_stack(w_z)

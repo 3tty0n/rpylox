@@ -1,3 +1,5 @@
+from lox.object import ObjString
+
 class ValueType:
     BOOL = 0
     NIL = 1
@@ -18,6 +20,9 @@ class Value(object):
     def repr(self):
         return str(self.value)
 
+    def get_value(self):
+        return self.value
+
     def is_bool(self):
         return self.value_type == ValueType.BOOL
 
@@ -29,6 +34,9 @@ class Value(object):
 
     def is_obj(self):
         return self.value_type == ValueType.NIL
+
+    def is_string(self):
+        return isinstance(self.value, ObjString)
 
     def as_bool(self):
         raise NotImplemented
@@ -124,3 +132,6 @@ class W_Obj(Value):
 
     def __repr__(self):
         return "W_Obj(%s)" % self.repr()
+
+    def repr(self):
+        return repr(self.value)
