@@ -19,25 +19,28 @@ class Obj(object):
 
 class ObjString(Obj):
 
-     def __init__(self, value):
-          self.type = ObjType.STRING
-          self.buffer = value
-          self.length = len(value)
+    def __init__(self, value):
+         self.type = ObjType.STRING
+         self.buffer = value
+         self.length = len(value)
 
-     def repr(self):
-          return self.buffer
+    def repr(self):
+         return self.buffer
 
-     def __repr__(self):
-          return self.repr()
+    def __repr__(self):
+         return self.repr()
 
-     def is_equal(self, other):
-         if self.type != other.type:
-             return False
-         return self.buffer == other.buffer
+    def is_equal(self, other):
+        if self.type != other.type:
+            return False
+        return self.buffer == other.buffer
 
-     def cmp_less(self, other):
+    def cmp_less(self, other):
          assert self.type == other.type
          return self.buffer < other.buffer
 
-     def concat(self, other):
+    def concat(self, other):
          return ObjString(self.buffer + other.buffer)
+
+    def get_buffer(self):
+         return self.buffer

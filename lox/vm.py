@@ -2,6 +2,7 @@ from lox.compiler import Compiler
 from lox.opcode import OpCode
 from lox.debug import disassemble_instruction, format_line_number
 from lox.value import W_Number, W_Bool, W_Nil, W_Obj
+from lox.object import ObjString
 
 class InterpretResult:
     INTERPRET_OK = 0
@@ -16,6 +17,8 @@ class VM(object):
 
     ip = 0
 
+    global_objects = {}
+
     debug_trace = True
 
     STACK_MAX_SIZE = 8
@@ -28,12 +31,20 @@ class VM(object):
         self.stack = [None] * self.STACK_MAX_SIZE
         self.stack_top = 0
 
+    def _reset_global_objects(self):
+        self.global_objects = {}
+
+    def _reset(self):
+        self._reset_stack()
+        self._reset_global_objects()
+
     def _push_stack(self, value):
         self.stack[self.stack_top] = value
         self.stack_top += 1
 
     def _pop_stack(self):
         self.stack_top -= 1
+        assert self.stack_top >= 0
         return self.stack[self.stack_top]
 
     def _peek_stack(self, n):
@@ -51,10 +62,13 @@ class VM(object):
             print self.stack[i],
         print "]"
 
+        print "       ",
+        print self.global_objects
+
     def _runtime_error(self, message):
         line_number = format_line_number(self.chunk, self.ip)
         print "%s\n[line %s] in script" % (message, line_number)
-        self._reset_stack()
+        self._reset()
 
     def interpret_chunk(self, chunk):
         self.chunk = chunk
@@ -62,7 +76,7 @@ class VM(object):
         return self.run()
 
     def interpret(self, source):
-        self._reset_stack()
+        self._reset()
 
         compiler = Compiler(source, debug_print=self.debug_trace)
         if compiler.compile():
@@ -80,7 +94,6 @@ class VM(object):
 
             instruction = self._read_byte()
             if instruction == OpCode.OP_RETURN:
-                print self._pop_stack()
                 return InterpretResult.INTERPRET_OK
             elif instruction == OpCode.OP_CONSTANT:
                 w_const = self._read_constant()
@@ -114,6 +127,26 @@ class VM(object):
                     self._runtime_error("Runtime error")
                     return InterpretResult.INTERPRET_RUNTIME_ERROR
                 self._push_stack(W_Number(-self._pop_stack().as_number()))
+            elif instruction == OpCode.OP_PRINT:
+                print repr(self._pop_stack())
+            elif instruction == OpCode.OP_POP:
+                self._pop_stack()
+            elif instruction == OpCode.OP_DEFINE_GLOBAL:
+                name = self._read_string()
+                self.global_objects[name] = self._pop_stack()
+            elif instruction == OpCode.OP_GET_GLOBAL:
+                name = self._read_string()
+                if name not in self.global_objects:
+                    self._runtime_error("Undefined variable '%s'." % name)
+                    return InterpretResult.INTERPRET_RUNTIME_ERROR
+                self._push_stack(self.global_objects[name])
+            elif instruction == OpCode.OP_SET_GLOBAL:
+                name = self._read_string()
+                if not name in self.global_objects:
+                    self._runtime_error("Undefined variable '%s'." % name)
+                    return InterpretResult.INTERPRET_RUNTIME_ERROR
+                self.global_objects[name] = self._pop_stack()
+                self._push_stack(W_Nil()) # To handle with OP_POP
             else:
                 print "Unknown opcode"
                 return InterpretResult.INTERPRET_RUNTIME_ERROR
@@ -126,6 +159,13 @@ class VM(object):
     def _read_constant(self):
         constant_index = self._read_byte()
         return self.chunk.constants[constant_index]
+
+    def _read_string(self):
+        w_const = self._read_constant()
+        assert isinstance(w_const, W_Obj)
+        obj_str = w_const.get_value()
+        isinstance(obj_str, ObjString)
+        return obj_str.get_buffer()
 
     def _binary_op(self, op):
         if op == "+":

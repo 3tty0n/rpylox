@@ -82,7 +82,7 @@ class W_Bool(Value):
         self.value_type = value_type
 
     def __repr__(self):
-        return "W_Bool(%s)" % self.repr()
+        return "%s" % self.repr()
 
     def as_number(self):
         if self.value:
@@ -99,7 +99,7 @@ class W_Number(Value):
         self.value_type = value_type
 
     def __repr__(self):
-        return "W_Number(%s)" % self.repr()
+        return "%s" % self.repr()
 
     def add(self, w_other):
         assert isinstance(w_other, W_Number)
@@ -131,7 +131,9 @@ class W_Obj(Value):
         self.value_type = value_type
 
     def __repr__(self):
-        return "W_Obj(%s)" % self.repr()
+        if isinstance(self.value, ObjString):
+            return '"%s"' % self.repr()
+        return self.repr()
 
     def repr(self):
         return repr(self.value)

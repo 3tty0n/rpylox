@@ -17,6 +17,16 @@ def disassemble_instruction(chunk, offset):
     instruction = chunk.code[offset]
     if instruction == OpCode.OP_RETURN:
         return simple_instruction("OP_RETURN", offset)
+    elif instruction == OpCode.OP_PRINT:
+        return simple_instruction("OP_PRINT", offset)
+    elif instruction == OpCode.OP_POP:
+        return simple_instruction("OP_POP", offset)
+    elif instruction == OpCode.OP_DEFINE_GLOBAL:
+        return constant_instruction("OP_DEFINE_GLOBAL", chunk, offset)
+    elif instruction == OpCode.OP_GET_GLOBAL:
+        return constant_instruction("OP_GET_GLOBAL", chunk, offset)
+    elif instruction == OpCode.OP_SET_GLOBAL:
+        return constant_instruction("OP_SET_GLOBAL", chunk, offset)
     elif instruction == OpCode.OP_CONSTANT:
         return constant_instruction("OP_CONSTANT", chunk, offset)
     elif instruction == OpCode.OP_NIL:

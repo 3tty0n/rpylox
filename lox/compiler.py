@@ -56,8 +56,12 @@ class Compiler(object):
     def compile(self):
         line = -1
         self.advance()
-        self.expression()
-        self.consume(TokenTypes.EOF, "Expect end of expression.")
+
+        # self.expression()
+        # self.consume(TokenTypes.EOF, "Expect end of expression.")
+
+        while not self.match(TokenTypes.EOF):
+            self.declaration()
 
         self.end_compiler()
 
@@ -82,6 +86,16 @@ class Compiler(object):
 
         self._error_at_current(message)
 
+    def match(self, token_type):
+        if not self._check(token_type):
+            return False
+
+        self.advance()
+        return True
+
+    def _check(self, token_type):
+        return self.parser.current.type == token_type
+
     def end_compiler(self):
         self.emit_return()
 
@@ -89,13 +103,12 @@ class Compiler(object):
             if not self.parser.had_error:
                 self.current_chunk().disassemble("code")
 
-
-    def number(self):
+    def number(self, can_assign):
         value = float(self.scanner.get_token_string(self.parser.previous))
         lox_value = W_Number(value)
         self.emit_constant(lox_value)
 
-    def string(self):
+    def string(self, can_assign):
         # the value itself has decorated with double quotes
         string_value = self.scanner.get_token_string(self.parser.previous)
         # remove " and extract the value
@@ -105,7 +118,20 @@ class Compiler(object):
         w_x = W_Obj(string_obj)
         self.emit_constant(w_x)
 
-    def literal(self):
+    def variable(self, can_assign):
+        self._named_variable(self.parser.previous, can_assign)
+
+    def _named_variable(self, token, can_assign):
+        name = self.scanner.get_token_string(token)
+        arg = self._identifier_constant(name)
+
+        if self.match(TokenTypes.EQUAL):
+            self.expression()
+            self.emit_bytes(OpCode.OP_SET_GLOBAL, arg)
+        else:
+            self.emit_bytes(OpCode.OP_GET_GLOBAL, arg)
+
+    def literal(self, can_assign):
         op_type = self.parser.previous.type
         if op_type == TokenTypes.FALSE:
             self.emit_byte(OpCode.OP_FALSE)
@@ -114,7 +140,7 @@ class Compiler(object):
         elif op_type == TokenTypes.TRUE:
             self.emit_byte(OpCode.OP_TRUE)
 
-    def unary(self):
+    def unary(self, can_assign):
         operator_type = self.parser.previous.type
 
         # Compile the operand
@@ -126,7 +152,7 @@ class Compiler(object):
         elif operator_type == TokenTypes.MINUS:
             self.emit_byte(OpCode.OP_NEGATE)
 
-    def binary(self):
+    def binary(self, can_assign):
         op_type = self.parser.previous.type
         rule = self._get_rule(op_type)
         self.parse_precedence(rule.precedence + 1)
@@ -159,15 +185,90 @@ class Compiler(object):
             self._error("Expect expression.")
             return
 
-        prefix_rule(self)
+        can_assign = precedence <= Precedence.ASSIGNMENT
+        prefix_rule(self, can_assign)
 
         while precedence <= self._get_rule(self.parser.current.type).precedence:
             self.advance()
             infix_rule = self._get_rule(self.parser.previous.type).infix
-            infix_rule(self)
+            infix_rule(self, can_assign)
+
+        if can_assign and self.match(TokenTypes.EQUAL):
+            self._error("Invalid assignment target.")
+
+    def _identifier_constant(self, name):
+        w_obj = W_Obj(ObjString(name))
+        return self._make_constant(w_obj)
+
+    def _parse_variable(self, message):
+        self.consume(TokenTypes.IDENTIFIER, message)
+
+        name = self.scanner.get_token_string(self.parser.previous)
+        return self._identifier_constant(name)
+
+    def define_variable(self, global_var):
+        self.emit_bytes(OpCode.OP_DEFINE_GLOBAL, global_var)
 
     def expression(self):
         self.parse_precedence(Precedence.ASSIGNMENT)
+
+    def var_declaration(self):
+        global_var = self._parse_variable("Expect variable name.")
+
+        if self.match(TokenTypes.EQUAL):
+            self.expression()
+        else:
+            self.emit_byte(OpCode.OP_NIL)
+
+        self.consume(TokenTypes.SEMICOLON, "Expect ';' aster variable declaration.")
+
+        self.define_variable(global_var)
+
+    def expression_statement(self):
+        self.expression()
+        self.consume(TokenTypes.SEMICOLON, "Expect ';' after expression.")
+        self.emit_byte(OpCode.OP_POP)
+
+    def print_statement(self):
+        self.expression()
+        self.consume(TokenTypes.SEMICOLON, "Expect ';' after value.")
+        self.emit_byte(OpCode.OP_PRINT)
+
+    def synchronize(self):
+        self.parser.panic_mdoe = False
+
+        while self.parser.current.type != TokenTypes.EOF:
+            if self.parser.previous.type == TokenTypes.SEMICOLON:
+                return
+            if self.parser.current.type in (
+                    TokenTypes.CLASS,
+                    TokenTypes.FUN,
+                    TokenTypes.VAR,
+                    TokenTypes.FOR,
+                    TokenTypes.IF,
+                    TokenTypes.WHILE,
+                    TokenTypes.PRINT,
+                    TokenTypes.RETURN
+            ):
+                return
+
+            self.advance()
+
+    def declaration(self):
+
+        if self.match(TokenTypes.VAR):
+            self.var_declaration()
+        else:
+            self.statement()
+
+        if self.parser.panic_mdoe:
+            self.synchronize()
+
+    def statement(self):
+        if self.match(TokenTypes.PRINT):
+            self.print_statement()
+        else:
+            self.expression_statement()
 
     def emit_byte(self, byte1):
         self.current_chunk().write_chunk(byte1, self.parser.previous.line)
@@ -179,7 +280,7 @@ class Compiler(object):
     def emit_return(self):
         self.emit_byte(OpCode.OP_RETURN)
 
-    def grouping(self):
+    def grouping(self, can_assign):
         self.expression()
         self.consume(TokenTypes.RIGHT_PAREN, "Expect ')' after expression.")
 
@@ -246,7 +347,7 @@ rules = [
     ParseRule(None,                 Compiler.binary,    Precedence.COMPARISON),  # TOKEN_GREATER_EQUAL
     ParseRule(None,                 Compiler.binary,    Precedence.COMPARISON),  # TOKEN_LESS
     ParseRule(None,                 Compiler.binary,    Precedence.COMPARISON),  # TOKEN_LESS_EQUAL
-    ParseRule(None,                 None,               Precedence.NONE),        # TOKEN_IDENTIFIER
+    ParseRule(Compiler.variable,    None,               Precedence.NONE),        # TOKEN_IDENTIFIER
     ParseRule(Compiler.string,      None,               Precedence.NONE),        # TOKEN_STRING
     ParseRule(Compiler.number,      None,               Precedence.NONE),        # TOKEN_NUMBER
     ParseRule(None,                 None,               Precedence.AND),         # TOKEN_AND
