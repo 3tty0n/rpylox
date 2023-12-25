@@ -67,7 +67,7 @@ def read_file(filename):
         # file = rfile.create_file(filename, 'r')
         file = open(filename, 'r')
     except IOError:
-        debug("Error opening file")
+        print "Error opening file"
         raise SystemExit(74)
     source = file.read()
     file.close()
