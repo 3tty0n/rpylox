@@ -39,6 +39,7 @@ def repl():
     print "Welcome to lox"
 
     while True:
+        print prompt,
         next_line = sys.stdin.readline(LINE_BUFFER_LENGTH)
         if not next_line:
             break
