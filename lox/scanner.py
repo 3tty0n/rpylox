@@ -256,17 +256,16 @@ class Scanner(object):
 
     def make_string(self):
         while self._peek() != '"' and not self._is_at_end():
-            if self._peek() == '\n': self.line += 1
+            if self._peek() == '\n':
+                self.line += 1
             self.advance()
 
         if self._is_at_end():
-            return self.make_error_token(
-                "Unterminated string."
-            )
+            return self._error_token("Unterminated string.")
 
         # The closing quote
         self.advance()
-        self.make_token(TokenTypes.STRING)
+        return self.make_token(TokenTypes.STRING)
 
     def make_token(self, token_type):
         return Token(
