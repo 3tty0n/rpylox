@@ -1,4 +1,4 @@
-from opcode import OpCode
+from lox.opcode import OpCode
 
 def disassemble_instruction(chunk, offset):
     print "%04d" % offset,
@@ -23,6 +23,10 @@ def disassemble_instruction(chunk, offset):
         return simple_instruction("OP_MULTIPLY", offset)
     elif instruction == OpCode.OP_DIVIDE:
         return simple_instruction("OP_DIVIDE", offset)
+    elif instruction == OpCode.OP_TRUE:
+        return simple_instruction("TRUE", offset)
+    elif instruction == OpCode.OP_FALSE:
+        return simple_instruction("FALSE", offset)
     else:
         print "Unknown opcde %d\n" % instruction
         return offset + 1

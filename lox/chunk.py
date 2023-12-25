@@ -1,5 +1,5 @@
-from debug import disassemble_instruction
-from value import Value, ValueArray
+from lox.debug import disassemble_instruction
+from lox.value import Value, ValueArray
 
 class OpCode:
     OP_RETURN = 0

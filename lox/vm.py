@@ -1,5 +1,6 @@
-from opcode import OpCode
-from debug import disassemble_instruction
+from lox.compiler import Compiler
+from lox.opcode import OpCode
+from lox.debug import disassemble_instruction
 
 class InterpretResult:
     INTERPRET_OK = 0
@@ -45,10 +46,20 @@ class VM:
             print self.stack[i],
         print "]"
 
-    def interpret(self, chunk):
+    def interpret_chunk(self, chunk):
         self.chunk = chunk
         self.ip = 0
         return self.run()
+
+    def interpret(self, source):
+        self._reset_stack()
+
+        compiler = Compiler(source, debug_print=self.debug_trace)
+        if compiler.compile():
+            # print compiler.current_chunk().disassemble("code")
+            return self.interpret_chunk(compiler.current_chunk())
+        else:
+            return InterpretResult.INTERPRET_COMPILE_ERROR
 
     def run(self):
         instruction = None
@@ -91,16 +102,16 @@ class VM:
         if op == "+":
             w_y = self._pop_stack()
             w_x = self._pop_stack()
-            self._push_stack(w_x + w_y)
+            self._push_stack(w_x.add(w_y))
         elif op == "-":
             w_y = self._pop_stack()
             w_x = self._pop_stack()
-            self._push_stack(w_x - w_y)
+            self._push_stack(w_x.sub(w_y))
         elif op == "*":
             w_y = self._pop_stack()
             w_x = self._pop_stack()
-            self._push_stack(w_x * w_y)
+            self._push_stack(w_x.mul(w_y))
         elif op == "/":
             w_y = self._pop_stack()
             w_x = self._pop_stack()
-            self._push_stack(w_x / w_y)
+            self._push_stack(w_x.div( w_y))
