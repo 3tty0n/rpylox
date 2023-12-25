@@ -53,7 +53,8 @@ TokenTypeToTokenName = {getattr(TokenTypes, token_type):
                          token_type for token_type in dir(TokenTypes) if not token_type.startswith("__")}
 
 
-def debug_token(token_type):
+def debug_token(token):
+    token_type = token.type
     return TokenTypeToTokenName[token_type]
 
 
@@ -93,6 +94,9 @@ class Scanner(object):
             return self.make_token(TokenTypes.EOF)
 
         c = self.advance()
+
+        if c.isalpha():
+            return self._make_identifier()
 
         if c.isdigit():
             return self._number()
@@ -198,7 +202,7 @@ class Scanner(object):
     def _make_identifier(self):
         while self._peek().isalpha() or self._peek().isdigit():
             self.advance()
-        return self._make_token(self._identifier())
+        return self.make_token(self._identifier())
 
     def _identifier(self):
         char = self.source[self.start]

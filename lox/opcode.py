@@ -2,7 +2,8 @@ class OpCode:
 
     OP_RETURN = 0
     OP_CONSTANT = OP_RETURN + 1
-    OP_NEGATE = OP_CONSTANT + 1
+    OP_NOT = OP_CONSTANT + 1
+    OP_NEGATE = OP_NOT + 1
     OP_EQUAL = OP_NEGATE + 1
     OP_GREATER = OP_EQUAL + 1
     OP_LESS = OP_GREATER + 1

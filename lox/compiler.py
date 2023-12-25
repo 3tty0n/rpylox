@@ -67,6 +67,8 @@ class Compiler(object):
 
         while True:
             token = self.scanner.scan_token()
+            if self.debug_print:
+                print "Scanning token %s" % (debug_token(token))
             self.parser.current = token
             if self.parser.current.type != TokenTypes.ERROR:
                 break
@@ -105,12 +107,15 @@ class Compiler(object):
             self.emit_byte(OpCode.OP_TRUE)
 
     def unary(self):
-        self.parse_precedence(Precedence.UNARY)
         operator_type = self.parser.previous.type
 
-        self.expression()
+        # Compile the operand
+        self.parse_precedence(Precedence.UNARY)
 
-        if operator_type == TokenTypes.MINUS:
+        # Emit the instruction
+        if operator_type == TokenTypes.BANG:
+            self.emit_byte(OpCode.OP_NOT)
+        elif operator_type == TokenTypes.MINUS:
             self.emit_byte(OpCode.OP_NEGATE)
 
     def binary(self):

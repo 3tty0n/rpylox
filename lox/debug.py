@@ -1,5 +1,11 @@
 from lox.opcode import OpCode
 
+def leftpad_string(string, width, char=" "):
+    l = len(string)
+    if l > width:
+        return string
+    return char * (width - l) + string
+
 def disassemble_instruction(chunk, offset):
     print "%04d" % offset,
 
@@ -13,8 +19,22 @@ def disassemble_instruction(chunk, offset):
         return simple_instruction("OP_RETURN", offset)
     elif instruction == OpCode.OP_CONSTANT:
         return constant_instruction("OP_CONSTANT", chunk, offset)
+    elif instruction == OpCode.OP_NIL:
+        return simple_instruction("OP_NIL", offset)
+    elif instruction == OpCode.OP_NOT:
+        return simple_instruction("OP_NOT", offset)
+    elif instruction == OpCode.OP_TRUE:
+        return simple_instruction("OP_TRUE", offset)
+    elif instruction == OpCode.OP_FALSE:
+        return simple_instruction("OP_FALSE", offset)
     elif instruction == OpCode.OP_NEGATE:
         return simple_instruction("OP_NEGATE", offset)
+    elif instruction == OpCode.OP_EQUAL:
+        return simple_instruction("OP_EQUAL", offset)
+    elif instruction == OpCode.OP_GREATER:
+        return simple_instruction("OP_GREATER", offset)
+    elif instruction == OpCode.OP_LESS:
+        return simple_instruction("OP_LESS", offset)
     elif instruction == OpCode.OP_ADD:
         return simple_instruction("OP_ADD", offset)
     elif instruction == OpCode.OP_SUBTRACT:
@@ -40,3 +60,9 @@ def constant_instruction(name, chunk, offset):
     print "%-16s '%4d'" % (name, constant),
     print chunk.constants.values[constant]
     return offset + 2
+
+def format_line_number(chunk, offset):
+    if offset > 0 and chunk.lines[offset] == chunk.lines[offset - 1]:
+        return "   |"
+    else:
+        return leftpad_string(str(chunk.lines[offset]), 4)

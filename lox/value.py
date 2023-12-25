@@ -6,11 +6,39 @@ class ValueType:
 
 class Value(object):
     def __init__(self, value, value_type):
-        self.value = value
-        self.value_type = value_type
+        if value_type == ValueType.BOOL:
+            W_Bool.__init__(self, value)
+        elif value_type == ValueType.NIL:
+            W_Nil.__init__(self)
+        elif value_type == ValueType.NUMBER:
+            W_Number.__init__(self, value)
+        elif value_type == ValueType.OBJ:
+            W_Obj.__init__(self, value)
 
     def repr(self):
         return str(self.value)
+
+    def is_bool(self):
+        return self.value_type == ValueType.BOOL
+
+    def is_number(self):
+        return self.value_type == ValueType.NUMBER
+
+    def is_nil(self):
+        return self.value_type == ValueType.NIL
+
+    def is_obj(self):
+        return self.value_type == ValueType.NIL
+
+    def as_bool(self):
+        raise NotImplemented
+
+    def as_number(self):
+        raise NotImplemented
+
+    def is_falsy(self):
+        return isinstance(self, W_Nil) or isinstance(self, W_Bool) and (not self.as_bool())
+
 
 class ValueArray(object):
     def __init__(self):
@@ -29,6 +57,17 @@ class ValueArray(object):
         self.values.append(value)
         return len(self.values) - 1
 
+class W_Nil(Value):
+    def __init__(self, value=None, value_type=ValueType.NIL):
+        self.value = value
+        self.value_type = value_type
+
+    def __repr__(self):
+        return "W_Nil"
+
+    def as_bool(self):
+        return W_Bool(False)
+
 class W_Bool(Value):
     def __init__(self, value, value_type=ValueType.BOOL):
         self.value = value
@@ -36,6 +75,15 @@ class W_Bool(Value):
 
     def __repr__(self):
         return "W_Bool(%s)" % self.repr()
+
+    def as_number(self):
+        if self.value:
+            return W_Number(1)
+        else:
+            return W_Number(0)
+
+    def as_bool(self):
+        return self.value
 
 class W_Number(Value):
     def __init__(self, value, value_type=ValueType.NUMBER):
@@ -60,6 +108,14 @@ class W_Number(Value):
     def div(self, w_other):
         assert isinstance(w_other, W_Number)
         return W_Number(self.value / w_other.value)
+
+    def as_number(self):
+        return self.value
+
+    def as_bool(self):
+        if self.value:
+            return True
+        return False
 
 class W_Obj(Value):
     def __init__(self, value, value_type=ValueType.OBJ):
