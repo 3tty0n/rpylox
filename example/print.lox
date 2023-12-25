@@ -1,0 +1,3 @@
+print 1 + 2;
+print 3 + 4;
+5 + 7; // not print this value
