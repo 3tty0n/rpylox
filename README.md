@@ -10,8 +10,7 @@
   - Skip this chapter because we can use built-in hash tables
 - [x] Chapter 21
 - [x] Chapter 22
-- [ ] Chapter 23
-  - Finished until 23.1 (2023/12/26)
+- [x] Chapter 23
 - [ ] Chapter 24
 - [ ] Chapter 25
 - [ ] Chapter 26
