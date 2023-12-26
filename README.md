@@ -11,7 +11,7 @@
 - [x] Chapter 21
 - [x] Chapter 22
 - [ ] Chapter 23
- - Finished until 23.1 (2023/12/26)
+  - Finished until 23.1 (2023/12/26)
 - [ ] Chapter 24
 - [ ] Chapter 25
 - [ ] Chapter 26
