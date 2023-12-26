@@ -180,6 +180,9 @@ class VM(object):
             elif instruction == OpCode.OP_JUMP:
                 offset = self._read_short()
                 self.ip += offset
+            elif instruction == OpCode.OP_LOOP: # backward jump
+                offset = self._read_short()
+                self.ip -= offset
             else:
                 print "Unknown opcode"
                 raise InterpretRuntimeError()

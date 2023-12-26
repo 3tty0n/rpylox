@@ -345,6 +345,48 @@ class Compiler(object):
         self.consume(TokenTypes.SEMICOLON, "Expect ';' after expression.")
         self.emit_byte(OpCode.OP_POP)
 
+    def for_statement(self):
+        self._begin_scope()
+
+        self.consume(TokenTypes.LEFT_PAREN, "Expect '(' after 'for'.")
+        if self.match(TokenTypes.SEMICOLON):
+            pass
+        elif self.match(TokenTypes.VAR):
+            self.var_declaration()
+        else:
+            self.expression_statement()
+
+        loop_start = self.current_chunk().get_count()
+        exit_jump = -1
+
+        if not self.match(TokenTypes.SEMICOLON):
+            self.expression()
+            self.consume(TokenTypes.SEMICOLON, "Expect ';' after loop condition.")
+
+            exit_jump = self.emit_jump(OpCode.OP_JUMP_IF_FALSE)
+            self.emit_byte(OpCode.OP_POP)
+
+        if not self.match(TokenTypes.RIGHT_PAREN):
+            body_jump = self.emit_jump(OpCode.OP_JUMP)
+            increment_start = self.current_chunk().get_count()
+            self.expression()
+            self.emit_byte(OpCode.OP_POP)
+            self.consume(TokenTypes.RIGHT_PAREN, "Expect ')' after condition.")
+
+            self.emit_loop(loop_start)
+            loop_start = increment_start
+            self._patch_jump(body_jump)
+
+        self.statement()
+
+        self.emit_loop(loop_start)
+
+        if exit_jump != -1:
+            self._patch_jump(exit_jump)
+            self.emit_byte(OpCode.OP_POP)
+
+        self._end_scope()
+
     def if_statement(self):
         self.consume(TokenTypes.LEFT_PAREN, "Expect '(' after 'if'.")
         self.expression()
@@ -368,6 +410,20 @@ class Compiler(object):
         self.expression()
         self.consume(TokenTypes.SEMICOLON, "Expect ';' after value.")
         self.emit_byte(OpCode.OP_PRINT)
+
+    def while_statement(self):
+        loop_start = self.current_chunk().get_count()
+        self.consume(TokenTypes.LEFT_PAREN, "Expect '(' after 'while'.")
+        self.expression()
+        self.consume(TokenTypes.RIGHT_PAREN, "Expect ')' after condition.")
+
+        exit_jump = self.emit_jump(OpCode.OP_JUMP_IF_FALSE)
+        self.emit_byte(OpCode.OP_POP)
+        self.statement()
+        self.emit_loop(loop_start)
+
+        self._patch_jump(exit_jump)
+        self.emit_byte(OpCode.OP_POP)
 
     def synchronize(self):
         self.parser.panic_mdoe = False
@@ -404,6 +460,10 @@ class Compiler(object):
             self.print_statement()
         elif self.match(TokenTypes.IF):
             self.if_statement()
+        elif self.match(TokenTypes.FOR):
+            self.for_statement()
+        elif self.match(TokenTypes.WHILE):
+            self.while_statement()
         elif self.match(TokenTypes.LEFT_BRACE):
             self._begin_scope()
             self.block()
@@ -417,6 +477,16 @@ class Compiler(object):
     def emit_bytes(self, byte1, byte2):
         self.emit_byte(byte1)
         self.emit_byte(byte2)
+
+    def emit_loop(self, loop_start):
+        self.emit_byte(OpCode.OP_LOOP)
+
+        offset = self.current_chunk().get_count() - loop_start + 2
+        if offset > UINT16_MAX:
+            self._error("Loop body too large.")
+
+        self.emit_byte((offset >> 8) & 0xff)
+        self.emit_byte(offset & 0xff)
 
     def emit_jump(self, instruction):
         self.emit_byte(instruction)
@@ -446,8 +516,8 @@ class Compiler(object):
         count = self.current_chunk().get_count()
         jump_distance = count - jump_op_offset - 2
 
-        if self.debug_print:
-            print "jump disance", jump_distance
+        # if self.debug_print:
+        #     print "jump disance", jump_distance
 
         if jump_distance > UINT16_MAX:
             self._error("Too much code to jump over.")

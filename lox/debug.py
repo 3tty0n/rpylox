@@ -101,7 +101,11 @@ def format_instruction_extended(chunk, instruction, instruction_name, offset):
             OpCode.OP_SET_GLOBAL
     ):
         repr, ip = byte_instruction(instruction_name, chunk, offset)
-    elif instruction in (OpCode.OP_JUMP_IF_FALSE, OpCode.OP_JUMP):
+    elif instruction in (
+            OpCode.OP_JUMP_IF_FALSE,
+            OpCode.OP_JUMP,
+            OpCode.OP_LOOP
+    ):
         repr, ip = jump_instruction(instruction_name, chunk, offset)
     else:
         repr, ip = simple_instruction(instruction_name, offset)
