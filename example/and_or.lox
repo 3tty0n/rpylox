@@ -1,0 +1,2 @@
+if (1 < 2 and 5 < 4) print "not printed.";
+if (true or false) print "printed.";

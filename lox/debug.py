@@ -46,8 +46,8 @@ def constant_instruction(name, chunk, offset):
 
 
 def jump_instruction(name, chunk, offset):
-    jump1 = chunk.code[offset + 1]
-    jump2 = chunk.code[offset + 2]
+    jump1 = chunk.code[offset + 1] << 8 & 0xff
+    jump2 = chunk.code[offset + 2] & 0xff
     return "%d %d" % (jump1, jump2), offset + 3
 
 

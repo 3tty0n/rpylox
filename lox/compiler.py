@@ -222,6 +222,24 @@ class Compiler(object):
         if op_type == TokenTypes.LESS_EQUAL:
             self.emit_bytes(OpCode.OP_GREATER, OpCode.OP_NEGATE)
 
+    def and_(self, can_assign):
+        end_jump = self.emit_jump(OpCode.OP_JUMP_IF_FALSE)
+
+        self.emit_byte(OpCode.OP_POP)
+        self.parse_precedence(Precedence.AND)
+
+        self._patch_jump(end_jump)
+
+    def or_(self, can_assign):
+        else_jump = self.emit_jump(OpCode.OP_JUMP_IF_FALSE)
+        end_jump = self.emit_jump(OpCode.OP_JUMP)
+
+        self._patch_jump(else_jump)
+        self.emit_byte(OpCode.OP_POP)
+
+        self.parse_precedence(Precedence.OR)
+        self._patch_jump(end_jump)
+
     def parse_precedence(self, precedence):
         self.advance()
         prefix_rule = self._get_rule(self.parser.previous.type).prefix
@@ -495,7 +513,7 @@ rules = [
     ParseRule(Compiler.variable,    None,               Precedence.NONE),        # TOKEN_IDENTIFIER
     ParseRule(Compiler.string,      None,               Precedence.NONE),        # TOKEN_STRING
     ParseRule(Compiler.number,      None,               Precedence.NONE),        # TOKEN_NUMBER
-    ParseRule(None,                 None,               Precedence.AND),         # TOKEN_AND
+    ParseRule(None,                 Compiler.and_,      Precedence.AND),         # TOKEN_AND
     ParseRule(None,                 None,               Precedence.NONE),        # TOKEN_CLASS
     ParseRule(None,                 None,               Precedence.NONE),        # TOKEN_ELSE
     ParseRule(Compiler.literal,     None,               Precedence.NONE),        # TOKEN_FALSE
@@ -503,7 +521,7 @@ rules = [
     ParseRule(None,                 None,               Precedence.NONE),        # TOKEN_FOR
     ParseRule(None,                 None,               Precedence.NONE),        # TOKEN_IF
     ParseRule(Compiler.literal,     None,               Precedence.NONE),        # TOKEN_NIL
-    ParseRule(None,                 None,               Precedence.OR),          # TOKEN_OR
+    ParseRule(None,                 Compiler.or_,       Precedence.OR),          # TOKEN_OR
     ParseRule(None,                 None,               Precedence.NONE),        # TOKEN_PRINT
     ParseRule(None,                 None,               Precedence.NONE),        # TOKEN_RETURN
     ParseRule(None,                 None,               Precedence.NONE),        # TOKEN_SUPER
