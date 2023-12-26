@@ -7,6 +7,8 @@ class ValueType:
     OBJ = 3
 
 class Value(object):
+    _immutable_fields_ = ['value_type']
+
     def __init__(self, value, value_type):
         self.value = value
         self.value_type = value_type
@@ -60,6 +62,8 @@ class ValueArray(object):
         return len(self.values) - 1
 
 class ValueNil(Value):
+    _immutable_fields_ = ['value', 'value_type']
+
     def __init__(self, value=None, value_type=ValueType.NIL):
         self.value_type = value_type
 
@@ -79,6 +83,8 @@ class ValueNil(Value):
         return self
 
 class ValueBool(Value):
+    _immutable_fields_ = ['value_type']
+
     def __init__(self, value, value_type=ValueType.BOOL):
         self.value = value
         self.value_type = value_type
@@ -106,6 +112,8 @@ class ValueBool(Value):
         return ValueBool(not self.value)
 
 class ValueNumber(Value):
+    _immutable_fields_ = ['value_type']
+
     def __init__(self, value, value_type=ValueType.NUMBER):
         self.value = value
         self.value_type = value_type
@@ -147,6 +155,8 @@ class ValueNumber(Value):
         return False
 
 class ValueObj(Value):
+    _immutable_fields_ = ['value_type']
+
     def __init__(self, obj, value_type=ValueType.OBJ):
         self.obj = obj
         self.value_type = value_type

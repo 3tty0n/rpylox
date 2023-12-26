@@ -4,6 +4,7 @@ from lox.debug import disassemble_instruction, format_line_number, get_printable
 from lox.value import ValueNil, ValueNumber, ValueBool, ValueNil, ValueObj, Value
 from lox.object import ObjString, Obj
 
+from rpython.rlib import jit
 from rpython.rlib.jit import JitDriver, we_are_translated
 
 jitdriver = JitDriver(greens=['ip', 'chunk',],
@@ -29,6 +30,8 @@ class InterpretRuntimeError(RuntimeError):
 
 
 class VM(object):
+    _immutable_fields_ = ['chunk', 'STACK_MAX_SIZE']
+
     chunk = None
     stack = None
     stack_top = 0
@@ -55,17 +58,21 @@ class VM(object):
         self._reset_global_objects()
 
     def _push_stack(self, value):
-        self.stack[self.stack_top] = value
-        self.stack_top += 1
+        stack_top = jit.promote(self.stack_top)
+        self.stack[stack_top] = value
+        self.stack_top = stack_top + 1
 
     def _pop_stack(self):
-        self.stack_top -= 1
-        assert self.stack_top >= 0
-        return self.stack[self.stack_top]
+        stack_top = jit.promote(self.stack_top)
+        stack_top -= 1
+        assert stack_top >= 0
+        self.stack_top = stack_top
+        return self.stack[stack_top]
 
     def _peek_stack(self, n):
-        assert n < self.stack_top
-        return self.stack[self.stack_top - (n + 1)]
+        stack_top = jit.promote(self.stack_top)
+        assert n < stack_top
+        return self.stack[stack_top - (n + 1)]
 
     def _trace_stack(self):
         print "       ",
@@ -96,7 +103,6 @@ class VM(object):
 
         compiler = Compiler(source, debug_print=self.debug_trace)
         if compiler.compile():
-            # print compiler.current_chunk().disassemble("code")
             return self.interpret_chunk(compiler.current_chunk())
         else:
             return InterpretResult.INTERPRET_COMPILE_ERROR
@@ -148,8 +154,8 @@ class VM(object):
             elif instruction == OpCode.OP_NEGATE:
                 if not self._peek_stack(0).is_number():
                     self._runtime_error("Runtime error")
-                    return InterpretResult.INTERPRET_RUNTIME_ERROR
-                self._push_stack(ValueNumber(-self._pop_stack().as_number()))
+                    raise InterpretRuntimeError()
+                self._push_stack(self._pop_stack().negate())
             elif instruction == OpCode.OP_PRINT:
                 value = self._pop_stack()
                 if isinstance(value, Value) or isinstance(value, Obj):
@@ -204,16 +210,17 @@ class VM(object):
                 raise InterpretRuntimeError()
 
     def _read_byte(self):
+        jit.promote(self.chunk)
         instruction = self.chunk.code[self.ip]
         self.ip += 1
         return instruction
 
     def _read_short(self):
+        jit.promote(self.chunk)
         offset1 = self.chunk.code[self.ip]
         offset2 = self.chunk.code[self.ip + 1]
         self.ip += 2
         return offset1 << 8 | offset2
-
 
     def _read_constant(self):
         constant_index = self._read_byte()

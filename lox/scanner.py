@@ -1,3 +1,5 @@
+from rpython.rlib import jit
+
 class TokenTypes(object):
     # Single-character tokens
     LEFT_PAREN = 0
@@ -281,6 +283,7 @@ class Scanner(object):
             line=self.line
         )
 
+    @jit.elidable
     def get_token_string(self, token):
         if isinstance(token, ErrorToken):
             return token.message

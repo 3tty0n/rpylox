@@ -6,6 +6,8 @@ from lox.object import ObjString
 from lox.scanner import Scanner, TokenTypes, debug_token
 from lox.value import Value, ValueNumber, ValueBool, ValueObj
 
+from rpython.rlib import jit
+
 UINT8_MAX = math.pow(2, 8)
 UINT16_MAX = math.pow(2, 16)
 
