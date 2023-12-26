@@ -261,7 +261,7 @@ class Scanner(object):
             self.advance()
 
         if self._is_at_end():
-            return self._error_token("Unterminated string.")
+            return self.make_error_token("Unterminated string.")
 
         # The closing quote
         self.advance()

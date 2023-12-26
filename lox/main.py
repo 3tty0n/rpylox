@@ -1,8 +1,10 @@
-from lox.chunk import Chunk
-from lox.opcode import OpCode
-from lox.vm import VM, InterpretResult
-
+import os
 import readline
+import math
+
+from lox.chunk import Chunk
+from lox.opcodes import OpCode
+from lox.vm import VM, InterpretCompileError, InterpretRuntimeError
 
 def test_chunk(argv):
     chunk = Chunk()
@@ -55,10 +57,12 @@ def run_file(filename):
     vm = VM(debug=True)
     try:
         result = vm.interpret(source)
-        if result == InterpretResult.INTERPRET_COMPILE_ERROR:
-            print "Compile error"
-        elif result == InterpretResult.INTERPRET_RUNTIME_ERROR:
-            print "Runtime error"
+    except InterpretCompileError as e:
+        print "Compile error"
+        raise e
+    except InterpretRuntimeError as e:
+        print "RUntime error"
+        raise e
     except ValueError:
         print "Unhandled exception in runFile"
 
@@ -66,12 +70,12 @@ def run_file(filename):
 def read_file(filename):
     try:
         # file = rfile.create_file(filename, 'r')
-        file = open(filename, 'r')
+        file = os.open(filename, os.O_RDONLY, 0777)
     except IOError:
         print "Error opening file"
         raise SystemExit(74)
-    source = file.read()
-    file.close()
+    source = os.read(file, int(math.pow(2, 20)))
+    os.close(file)
     return source
 
 

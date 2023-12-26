@@ -1,13 +1,21 @@
 from lox.compiler import Compiler
-from lox.opcode import OpCode
+from lox.opcodes import OpCode
 from lox.debug import disassemble_instruction, format_line_number
-from lox.value import W_Number, W_Bool, W_Nil, W_Obj
-from lox.object import ObjString
+from lox.value import ValueNil, ValueNumber, ValueBool, ValueNil, ValueObj, Value
+from lox.object import ObjString, Obj
 
 class InterpretResult:
     INTERPRET_OK = 0
     INTERPRET_COMPILE_ERROR = INTERPRET_OK + 1
     INTERPRET_RUNTIME_ERROR = INTERPRET_COMPILE_ERROR + 1
+
+
+class InterpretCompileError(RuntimeError):
+    pass
+
+
+class InterpretRuntimeError(RuntimeError):
+    pass
 
 
 class VM(object):
@@ -59,11 +67,11 @@ class VM(object):
 
         print "[",
         for i in range(self.stack_top):
-            print self.stack[i],
+            print self.stack[i].repr(),
         print "]"
 
-        print "       ",
-        print self.global_objects
+        print "       "
+        # print self.global_objects
 
     def _runtime_error(self, message):
         line_number = format_line_number(self.chunk, self.ip)
@@ -99,13 +107,13 @@ class VM(object):
                 w_const = self._read_constant()
                 self._push_stack(w_const)
             elif instruction == OpCode.OP_NIL:
-                self._push_stack(W_Nil())
+                self._push_stack(ValueNil())
             elif instruction == OpCode.OP_TRUE:
-                self._push_stack(W_Bool(True))
+                self._push_stack(ValueBool(True))
             elif instruction == OpCode.OP_FALSE:
-                self._push_stack(W_Bool(False))
+                self._push_stack(ValueBool(False))
             elif instruction == OpCode.OP_NOT:
-                self._push_stack(W_Bool(self._pop_stack().is_falsy()))
+                self._push_stack(ValueBool(self._pop_stack().is_falsy()))
             elif instruction == OpCode.OP_EQUAL:
                 self._binary_op("==")
             elif instruction == OpCode.OP_LESS:
@@ -113,7 +121,7 @@ class VM(object):
             elif instruction == OpCode.OP_GREATER:
                 self._binary_op(">")
             elif instruction == OpCode.OP_NEGATE:
-                self._push_stack(-self._pop_stack())
+                self._push_stack(self._pop_stack().negate())
             elif instruction == OpCode.OP_ADD:
                 self._binary_op("+")
             elif instruction == OpCode.OP_SUBTRACT:
@@ -126,30 +134,40 @@ class VM(object):
                 if not self._peek_stack(0).is_number():
                     self._runtime_error("Runtime error")
                     return InterpretResult.INTERPRET_RUNTIME_ERROR
-                self._push_stack(W_Number(-self._pop_stack().as_number()))
+                self._push_stack(ValueNumber(-self._pop_stack().as_number()))
             elif instruction == OpCode.OP_PRINT:
-                print repr(self._pop_stack())
+                value = self._pop_stack()
+                if isinstance(value, Value) or isinstance(value, Obj):
+                    print value.repr()
+                else:
+                    print value
             elif instruction == OpCode.OP_POP:
                 self._pop_stack()
             elif instruction == OpCode.OP_DEFINE_GLOBAL:
                 name = self._read_string()
-                self.global_objects[name] = self._pop_stack()
+                assert isinstance(name, ObjString)
+                name_hash = name.hash()
+                self.global_objects[name_hash] = self._pop_stack()
             elif instruction == OpCode.OP_GET_GLOBAL:
                 name = self._read_string()
-                if name not in self.global_objects:
+                assert isinstance(name, ObjString)
+                name_hash = name.hash()
+                if name_hash not in self.global_objects:
                     self._runtime_error("Undefined variable '%s'." % name)
-                    return InterpretResult.INTERPRET_RUNTIME_ERROR
-                self._push_stack(self.global_objects[name])
+                    raise InterpretRuntimeError()
+                self._push_stack(self.global_objects[name_hash])
             elif instruction == OpCode.OP_SET_GLOBAL:
                 name = self._read_string()
-                if not name in self.global_objects:
+                assert isinstance(name, ObjString)
+                name_hash = name.hash()
+                if not name_hash in self.global_objects:
                     self._runtime_error("Undefined variable '%s'." % name)
-                    return InterpretResult.INTERPRET_RUNTIME_ERROR
-                self.global_objects[name] = self._pop_stack()
-                self._push_stack(W_Nil()) # To handle with OP_POP
+                    raise InterpretRuntimeError()
+                self.global_objects[name_hash] = self._pop_stack()
+                self._push_stack(ValueNil()) # To handle with OP_POP
             else:
                 print "Unknown opcode"
-                return InterpretResult.INTERPRET_RUNTIME_ERROR
+                raise InterpretRuntimeError()
 
     def _read_byte(self):
         instruction = self.chunk.code[self.ip]
@@ -162,10 +180,10 @@ class VM(object):
 
     def _read_string(self):
         w_const = self._read_constant()
-        assert isinstance(w_const, W_Obj)
+        assert isinstance(w_const, ValueObj)
         obj_str = w_const.get_value()
         isinstance(obj_str, ObjString)
-        return obj_str.get_buffer()
+        return obj_str
 
     def _binary_op(self, op):
         if op == "+":
@@ -177,7 +195,7 @@ class VM(object):
                 self._push_stack(w_x.add(w_y))
             else:
                 self._runtime_error("Operands must be two numbers or two strings.")
-                return InterpretResult.INTERPRET_RUNTIME_ERROR
+                raise InterpretRuntimeError()
         elif op == "-":
             w_y = self._pop_stack()
             w_x = self._pop_stack()
@@ -193,21 +211,23 @@ class VM(object):
         elif op == "<":
             w_y = self._pop_stack()
             w_x = self._pop_stack()
-            w_z = W_Bool(w_x.as_number() < w_y.as_number())
+            w_z = ValueBool(w_x.as_number() < w_y.as_number())
             self._push_stack(w_z)
         elif op == ">":
             w_y = self._pop_stack()
             w_x = self._pop_stack()
-            w_z = W_Bool(w_x.as_number() > w_y.as_number())
+            w_z = ValueBool(w_x.as_number() > w_y.as_number())
             self._push_stack(w_z)
         elif op == "==":
             w_y = self._pop_stack()
             w_x = self._pop_stack()
-            w_z = W_Bool(w_x.as_number() == w_y.as_number())
+            w_z = ValueBool(w_x.as_number() == w_y.as_number())
             self._push_stack(w_z)
 
     def _concatinate(self, w_x, w_y):
+        assert isinstance(w_x, ValueObj)
+        assert isinstance(w_y, ValueObj)
         obj_str1 = w_x.get_value()
         obj_str2 = w_y.get_value()
-        w_z = W_Obj(obj_str1.concat(obj_str2))
+        w_z = ValueObj(obj_str1.concat(obj_str2))
         self._push_stack(w_z)

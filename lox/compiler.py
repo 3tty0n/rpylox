@@ -1,10 +1,10 @@
 import sys
 
 from lox.chunk import Chunk
-from lox.opcode import OpCode
+from lox.opcodes import OpCode
 from lox.object import ObjString
 from lox.scanner import Scanner, TokenTypes, debug_token
-from lox.value import Value, W_Number, W_Obj
+from lox.value import Value, ValueNumber, ValueBool, ValueObj
 
 class Parser(object):
     def __init__(self):
@@ -105,7 +105,7 @@ class Compiler(object):
 
     def number(self, can_assign):
         value = float(self.scanner.get_token_string(self.parser.previous))
-        lox_value = W_Number(value)
+        lox_value = ValueNumber(value)
         self.emit_constant(lox_value)
 
     def string(self, can_assign):
@@ -115,7 +115,7 @@ class Compiler(object):
         slice_end = len(string_value) - 1
         assert slice_end > 0
         string_obj = ObjString(string_value[1:slice_end])
-        w_x = W_Obj(string_obj)
+        w_x = ValueObj(string_obj)
         self.emit_constant(w_x)
 
     def variable(self, can_assign):
@@ -197,7 +197,7 @@ class Compiler(object):
             self._error("Invalid assignment target.")
 
     def _identifier_constant(self, name):
-        w_obj = W_Obj(ObjString(name))
+        w_obj = ValueObj(ObjString(name))
         return self._make_constant(w_obj)
 
     def _parse_variable(self, message):
