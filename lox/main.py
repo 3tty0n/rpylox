@@ -6,6 +6,8 @@ from lox.chunk import Chunk
 from lox.opcodes import OpCode
 from lox.vm import VM, InterpretCompileError, InterpretRuntimeError
 
+from rpython.rlib import rfile
+
 def test_chunk(argv):
     chunk = Chunk()
     constant = chunk.add_constant(1.2)
@@ -40,15 +42,20 @@ def repl():
 
     print "Welcome to lox"
 
-    while True:
-        print prompt,
-        next_line = sys.stdin.readline(LINE_BUFFER_LENGTH)
-        if not next_line:
-            break
+    stdin, stdout, stderr = rfile.create_stdio()
 
-        print
+    try:
+        while True:
+            stdout.write("> ")
+            next_line = stdin.readline()
+            if not next_line:
+                break
 
-        vm.interpret(next_line)
+            print
+            vm.interpret(next_line)
+
+    except KeyboardInterrupt:
+        stdout.write("Byte!\n")
 
 
 def run_file(filename):
@@ -86,12 +93,7 @@ def main(argv):
     elif len(argv) == 2:
         run_file(argv[1])
     else:
-        sys.stderr.write("Usage: lox [path]\n")
-        exit(64)
+        print "Usage: lox [path]"
+        raise SystemExit(64)
 
     return 0
-
-
-if __name__ == "__main__":
-    import sys
-    main(sys.argv)
