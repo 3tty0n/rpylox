@@ -45,6 +45,12 @@ def constant_instruction(name, chunk, offset):
     return format_constant(name, chunk, constant), offset + 2
 
 
+def jump_instruction(name, chunk, offset):
+    jump1 = chunk.code[offset + 1]
+    jump2 = chunk.code[offset + 2]
+    return "%d %d" % (jump1, jump2), offset + 3
+
+
 def get_printable_location(ip, passed_instruction, chunk, vm):
     line_number = format_line_number(chunk, ip)
     instruction_index = format_ip(ip)
@@ -88,11 +94,15 @@ def format_instruction_extended(chunk, instruction, instruction_name, offset):
         ip = offset + 1
     elif instruction in OpCode.BinaryOps:
         repr, ip = binary_instruction(instruction_name, chunk, offset)
-    elif (
-            instruction == OpCode.OP_SET_LOCAL or
-            instruction == OpCode.OP_GET_LOCAL
+    elif instruction in (
+            OpCode.OP_SET_LOCAL,
+            OpCode.OP_GET_LOCAL,
+            OpCode.OP_GET_GLOBAL,
+            OpCode.OP_SET_GLOBAL
     ):
         repr, ip = byte_instruction(instruction_name, chunk, offset)
+    elif instruction in (OpCode.OP_JUMP_IF_FALSE, OpCode.OP_JUMP):
+        repr, ip = jump_instruction(instruction_name, chunk, offset)
     else:
         repr, ip = simple_instruction(instruction_name, offset)
     return ip, repr

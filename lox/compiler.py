@@ -1,10 +1,13 @@
-import sys
+import math
 
 from lox.chunk import Chunk
 from lox.opcodes import OpCode
 from lox.object import ObjString
 from lox.scanner import Scanner, TokenTypes, debug_token
 from lox.value import Value, ValueNumber, ValueBool, ValueObj
+
+UINT8_MAX = math.pow(2, 8)
+UINT16_MAX = math.pow(2, 16)
 
 class Parser(object):
     def __init__(self):
@@ -324,6 +327,25 @@ class Compiler(object):
         self.consume(TokenTypes.SEMICOLON, "Expect ';' after expression.")
         self.emit_byte(OpCode.OP_POP)
 
+    def if_statement(self):
+        self.consume(TokenTypes.LEFT_PAREN, "Expect '(' after 'if'.")
+        self.expression()
+        self.consume(TokenTypes.RIGHT_PAREN, "Expect ')' after condition.")
+
+        then_jump = self.emit_jump(OpCode.OP_JUMP_IF_FALSE)
+        self.emit_byte(OpCode.OP_POP)
+        self.statement() # then branch statement
+
+        else_jump = self.emit_jump(OpCode.OP_JUMP)
+
+        self._patch_jump(then_jump)
+        self.emit_byte(OpCode.OP_POP)
+
+        if self.match(TokenTypes.ELSE):
+            self.statement() # else branch statement
+
+        self._patch_jump(else_jump)
+
     def print_statement(self):
         self.expression()
         self.consume(TokenTypes.SEMICOLON, "Expect ';' after value.")
@@ -362,6 +384,8 @@ class Compiler(object):
     def statement(self):
         if self.match(TokenTypes.PRINT):
             self.print_statement()
+        elif self.match(TokenTypes.IF):
+            self.if_statement()
         elif self.match(TokenTypes.LEFT_BRACE):
             self._begin_scope()
             self.block()
@@ -375,6 +399,12 @@ class Compiler(object):
     def emit_bytes(self, byte1, byte2):
         self.emit_byte(byte1)
         self.emit_byte(byte2)
+
+    def emit_jump(self, instruction):
+        self.emit_byte(instruction)
+        self.emit_byte(0xff)
+        self.emit_byte(0xff)
+        return self.current_chunk().get_count() - 2
 
     def emit_return(self):
         self.emit_byte(OpCode.OP_RETURN)
@@ -393,6 +423,22 @@ class Compiler(object):
 
     def emit_constant(self, value):
         self.emit_bytes(OpCode.OP_CONSTANT, self._make_constant(value))
+
+    def _patch_jump(self, jump_op_offset):
+        count = self.current_chunk().get_count()
+        jump_distance = count - jump_op_offset - 2
+
+        if self.debug_print:
+            print "jump disance", jump_distance
+
+        if jump_distance > UINT16_MAX:
+            self._error("Too much code to jump over.")
+
+        jump1 = (jump_distance >> 8) & 0xff
+        jump2 = jump_distance & 0xff
+
+        self.current_chunk().set_to_code(jump_op_offset, jump1)
+        self.current_chunk().set_to_code(jump_op_offset + 1, jump2)
 
     def _error_at(self, token, msg):
         if self.parser.panic_mdoe:

@@ -12,6 +12,7 @@ class Chunk:
 
     def write_chunk(self, byte, line):
         self.code.append(byte)
+        self.count += 1
         self.lines.append(line)
 
     def disassemble(self, name):
@@ -29,3 +30,9 @@ class Chunk:
     def add_constant(self, value):
         self.constants.append(value)
         return len(self.constants) - 1
+
+    def get_count(self):
+        return self.count
+
+    def set_to_code(self, offset, value):
+        self.code[offset] = value

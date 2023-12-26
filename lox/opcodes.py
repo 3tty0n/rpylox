@@ -1,7 +1,8 @@
 class OpCode:
 
     OP_RETURN = 0
-    OP_CONSTANT = OP_RETURN + 1
+    OP_NOP = OP_RETURN + 1
+    OP_CONSTANT = OP_NOP + 1
     OP_NOT = OP_CONSTANT + 1
     OP_NEGATE = OP_NOT + 1
     OP_EQUAL = OP_NEGATE + 1
@@ -15,7 +16,9 @@ class OpCode:
     OP_TRUE = OP_FALSE + 1
     OP_NIL = OP_TRUE + 1
     OP_PRINT = OP_NIL + 1
-    OP_POP = OP_PRINT + 1
+    OP_JUMP_IF_FALSE = OP_PRINT + 1
+    OP_JUMP = OP_JUMP_IF_FALSE + 1
+    OP_POP = OP_JUMP + 1
     OP_DEFINE_GLOBAL = OP_POP + 1
     OP_GET_GLOBAL = OP_DEFINE_GLOBAL + 1
     OP_SET_GLOBAL = OP_GET_GLOBAL + 1

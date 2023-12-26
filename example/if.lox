@@ -1,0 +1,3 @@
+if (false) print "not printed";
+else print "should be printed";
+print "continued";

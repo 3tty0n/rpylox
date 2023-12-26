@@ -56,8 +56,8 @@ class VM(object):
         return self.stack[self.stack_top]
 
     def _peek_stack(self, n):
-        assert n <= self.stack_top
-        return self.stack[self.stack_top - n]
+        assert n < self.stack_top
+        return self.stack[self.stack_top - (n + 1)]
 
     def _trace_stack(self):
         print "       ",
@@ -103,6 +103,8 @@ class VM(object):
             instruction = self._read_byte()
             if instruction == OpCode.OP_RETURN:
                 return InterpretResult.INTERPRET_OK
+            elif instruction == OpCode.OP_NOP:
+                pass
             elif instruction == OpCode.OP_CONSTANT:
                 w_const = self._read_constant()
                 self._push_stack(w_const)
@@ -170,8 +172,14 @@ class VM(object):
                 self._push_stack(self.stack[slot])
             elif instruction == OpCode.OP_SET_LOCAL:
                 slot = self._read_byte()
-                self.stack[slot] = self._pop_stack()
-                self._push_stack(ValueNil())
+                self.stack[slot] = self._peek_stack(0)
+            elif instruction == OpCode.OP_JUMP_IF_FALSE:
+                offset = self._read_short()
+                if self._peek_stack(0).is_falsy():
+                    self.ip += offset
+            elif instruction == OpCode.OP_JUMP:
+                offset = self._read_short()
+                self.ip += offset
             else:
                 print "Unknown opcode"
                 raise InterpretRuntimeError()
@@ -180,6 +188,13 @@ class VM(object):
         instruction = self.chunk.code[self.ip]
         self.ip += 1
         return instruction
+
+    def _read_short(self):
+        offset1 = self.chunk.code[self.ip]
+        offset2 = self.chunk.code[self.ip + 1]
+        self.ip += 2
+        return offset1 << 8 | offset2
+
 
     def _read_constant(self):
         constant_index = self._read_byte()
