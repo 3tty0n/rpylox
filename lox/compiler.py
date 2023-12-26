@@ -43,6 +43,19 @@ class ParseRule(object):
         else:
             raise Exception("unsupported item: %d " % item)
 
+class Local(object):
+    def __init__(self, token, depth):
+        self.token = token
+        self.depth = depth
+
+    def get_depth(self):
+        return self.depth
+
+    def set_depth(self, v):
+        self.depth = v
+
+    def get_token(self):
+        return self.token
 
 class Compiler(object):
 
@@ -52,6 +65,11 @@ class Compiler(object):
         self.parser = Parser()
         self.chunk = Chunk()
         self.debug_print = debug_print
+
+        self._LOCAL_COUNT_MAX = 16
+        self.local_variables = [None] * self._LOCAL_COUNT_MAX
+        self.local_count = 0
+        self.scope_depth = 0
 
     def compile(self):
         line = -1
@@ -103,6 +121,19 @@ class Compiler(object):
             if not self.parser.had_error:
                 self.current_chunk().disassemble("code")
 
+    def _begin_scope(self):
+        self.scope_depth += 1
+
+    def _end_scope(self):
+        self.scope_depth -= 1
+
+        while (
+                self.local_count > 0
+                and self.local_variables[self.local_count - 1].get_depth() > self.scope_depth
+        ):
+            self.emit_byte(OpCode.OP_POP)
+            self.local_count -= 1
+
     def number(self, can_assign):
         value = float(self.scanner.get_token_string(self.parser.previous))
         lox_value = ValueNumber(value)
@@ -122,14 +153,24 @@ class Compiler(object):
         self._named_variable(self.parser.previous, can_assign)
 
     def _named_variable(self, token, can_assign):
-        name = self.scanner.get_token_string(token)
-        arg = self._identifier_constant(name)
+        # name = self.scanner.get_token_string(token)
+        # arg = self._identifier_constant(name)
 
-        if self.match(TokenTypes.EQUAL):
-            self.expression()
-            self.emit_bytes(OpCode.OP_SET_GLOBAL, arg)
+        arg = self._resolve_local(token)
+        if arg != -1:
+            get_op = OpCode.OP_GET_LOCAL
+            set_op = OpCode.OP_SET_LOCAL
         else:
-            self.emit_bytes(OpCode.OP_GET_GLOBAL, arg)
+            name = self.scanner.get_token_string(token)
+            arg = self._identifier_constant(name)
+            get_op = OpCode.OP_GET_GLOBAL
+            set_op = OpCode.OP_SET_GLOBAL
+
+        if can_assign and self.match(TokenTypes.EQUAL):
+            self.expression()
+            self.emit_bytes(set_op, arg)
+        else:
+            self.emit_bytes(get_op, arg)
 
     def literal(self, can_assign):
         op_type = self.parser.previous.type
@@ -200,17 +241,71 @@ class Compiler(object):
         w_obj = ValueObj(ObjString(name))
         return self._make_constant(w_obj)
 
+    def _identifier_equal(self, token1, token2):
+        return (
+            self.scanner.get_token_string(token1) == self.scanner.get_token_string(token2)
+        )
+
+    def _resolve_local(self, token):
+        for i in range(self.local_count):
+            local = self.local_variables[i]
+            if self._identifier_equal(token, local.get_token()):
+                if local.get_depth() == -1:
+                    self._error("Can't read local variable in its own initializer.")
+                return i
+        return -1
+
+    def _add_local(self, token):
+        if self.local_count == self._LOCAL_COUNT_MAX:
+            self._error("Too many local variables in function.")
+            return
+
+        # local = Local(token, self.scope_depth)
+        local = Local(token, -1)
+        self.local_variables[self.local_count] = local
+        self.local_count += 1
+
+    def _declare_variable(self):
+        if self.scope_depth == 0: return
+
+        token = self.parser.previous
+
+        for i in range(self.local_count):
+            local = self.local_variables[i]
+            if local.get_depth() != -1 and local.get_depth() < self.scope_depth:
+                break
+
+            if self._identifier_equal(token, local.get_token()):
+                self._error("Already a variable with this name in this scope.")
+
+        self._add_local(token)
+
     def _parse_variable(self, message):
         self.consume(TokenTypes.IDENTIFIER, message)
+
+        self._declare_variable()
+        if self.scope_depth > 0: return 0
 
         name = self.scanner.get_token_string(self.parser.previous)
         return self._identifier_constant(name)
 
-    def define_variable(self, global_var):
+    def _mark_initialized(self):
+        self.local_variables[self.local_count - 1].set_depth(self.scope_depth)
+
+    def _define_variable(self, global_var):
+        if self.scope_depth > 0:
+            self._mark_initialized()
+            return
         self.emit_bytes(OpCode.OP_DEFINE_GLOBAL, global_var)
 
     def expression(self):
         self.parse_precedence(Precedence.ASSIGNMENT)
+
+    def block(self):
+        while not self._check(TokenTypes.RIGHT_BRACE) and not self._check(TokenTypes.EOF):
+            self.declaration()
+
+        self.consume(TokenTypes.RIGHT_BRACE, "Expect '}' after block.")
 
     def var_declaration(self):
         global_var = self._parse_variable("Expect variable name.")
@@ -222,7 +317,7 @@ class Compiler(object):
 
         self.consume(TokenTypes.SEMICOLON, "Expect ';' aster variable declaration.")
 
-        self.define_variable(global_var)
+        self._define_variable(global_var)
 
     def expression_statement(self):
         self.expression()
@@ -267,6 +362,10 @@ class Compiler(object):
     def statement(self):
         if self.match(TokenTypes.PRINT):
             self.print_statement()
+        elif self.match(TokenTypes.LEFT_BRACE):
+            self._begin_scope()
+            self.block()
+            self._end_scope()
         else:
             self.expression_statement()
 
@@ -302,11 +401,11 @@ class Compiler(object):
         print "[line %d] Error" % token.line,
 
         if token.type == TokenTypes.EOF:
-            print " at end"
+            print " at end",
         elif token.type == TokenTypes.ERROR:
             pass
         else:
-            print " at '%s'" % self.scanner.get_token_string(token)
+            print " at '%s'" % self.scanner.get_token_string(token),
         print ": %s\n" % msg
 
         self.parser.had_error = True

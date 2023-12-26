@@ -1,0 +1,11 @@
+{
+    var a = 10;
+    var b = 11;
+    {
+        var c = 3;
+        print c;
+    }
+    b = a + b;
+    print b;
+    // print c; // error
+}

@@ -165,6 +165,13 @@ class VM(object):
                     raise InterpretRuntimeError()
                 self.global_objects[name_hash] = self._pop_stack()
                 self._push_stack(ValueNil()) # To handle with OP_POP
+            elif instruction == OpCode.OP_GET_LOCAL:
+                slot = self._read_byte()
+                self._push_stack(self.stack[slot])
+            elif instruction == OpCode.OP_SET_LOCAL:
+                slot = self._read_byte()
+                self.stack[slot] = self._pop_stack()
+                self._push_stack(ValueNil())
             else:
                 print "Unknown opcode"
                 raise InterpretRuntimeError()

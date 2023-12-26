@@ -28,6 +28,11 @@ def binary_instruction(name, chunk, offset):
     return "", offset + 1
 
 
+def byte_instruction(name, chunk, offset):
+    slot = chunk.code[offset + 1]
+    return str(slot), offset + 2
+
+
 def format_constant(name, chunk, constant):
     return "(%s) %s" % (
         leftpad_string("%d" % constant, 2, '0'),
@@ -83,6 +88,11 @@ def format_instruction_extended(chunk, instruction, instruction_name, offset):
         ip = offset + 1
     elif instruction in OpCode.BinaryOps:
         repr, ip = binary_instruction(instruction_name, chunk, offset)
+    elif (
+            instruction == OpCode.OP_SET_LOCAL or
+            instruction == OpCode.OP_GET_LOCAL
+    ):
+        repr, ip = byte_instruction(instruction_name, chunk, offset)
     else:
         repr, ip = simple_instruction(instruction_name, offset)
     return ip, repr

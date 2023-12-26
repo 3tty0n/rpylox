@@ -19,6 +19,8 @@ class OpCode:
     OP_DEFINE_GLOBAL = OP_POP + 1
     OP_GET_GLOBAL = OP_DEFINE_GLOBAL + 1
     OP_SET_GLOBAL = OP_GET_GLOBAL + 1
+    OP_GET_LOCAL = OP_SET_GLOBAL + 1
+    OP_SET_LOCAL = OP_GET_LOCAL + 1
 
     BinaryOps = [
         OP_ADD,
