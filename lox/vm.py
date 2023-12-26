@@ -1,8 +1,18 @@
 from lox.compiler import Compiler
 from lox.opcodes import OpCode
-from lox.debug import disassemble_instruction, format_line_number
+from lox.debug import disassemble_instruction, format_line_number, get_printable_location
 from lox.value import ValueNil, ValueNumber, ValueBool, ValueNil, ValueObj, Value
 from lox.object import ObjString, Obj
+
+from rpython.rlib.jit import JitDriver, we_are_translated
+
+jitdriver = JitDriver(greens=['ip', 'chunk',],
+                      reds=['stack_top', 'stack', 'self'],
+                      get_printable_location=get_printable_location)
+
+def jitpolicy(driver):
+    from rpython.jit.codewriter.policy import JitPolicy
+    return JitPolicy()
 
 class InterpretResult:
     INTERPRET_OK = 0
@@ -26,8 +36,6 @@ class VM(object):
     ip = 0
 
     global_objects = {}
-
-    debug_trace = True
 
     STACK_MAX_SIZE = 8
 
@@ -96,9 +104,14 @@ class VM(object):
     def run(self):
         instruction = None
         while True:
-            if self.debug_trace:
-                disassemble_instruction(self.chunk, self.ip)
-                self._trace_stack()
+            if not we_are_translated():
+                if self.debug_trace:
+                    disassemble_instruction(self.chunk, self.ip)
+                    self._trace_stack()
+
+            jitdriver.jit_merge_point(ip=self.ip, chunk=self.chunk,
+                                      stack=self.stack, stack_top=self.stack_top,
+                                      self=self)
 
             instruction = self._read_byte()
             if instruction == OpCode.OP_RETURN:
@@ -183,6 +196,9 @@ class VM(object):
             elif instruction == OpCode.OP_LOOP: # backward jump
                 offset = self._read_short()
                 self.ip -= offset
+                jitdriver.can_enter_jit(ip=self.ip, chunk=self.chunk,
+                                        stack=self.stack, stack_top=self.stack_top,
+                                        self=self)
             else:
                 print "Unknown opcode"
                 raise InterpretRuntimeError()

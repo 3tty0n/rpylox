@@ -9,7 +9,10 @@ def leftpad_string(string, width, char=" "):
     l = len(string)
     if l > width:
         return string
-    return char * (width - l) + string
+    fmt = ""
+    for i in range(width - l):
+        fmt += char
+    return fmt + string
 
 
 def rightpad_string(string, width, char=" "):
@@ -51,7 +54,7 @@ def jump_instruction(name, chunk, offset):
     return "%d %d" % (jump1, jump2), offset + 3
 
 
-def get_printable_location(ip, passed_instruction, chunk, vm):
+def get_printable_location(ip, chunk):
     line_number = format_line_number(chunk, ip)
     instruction_index = format_ip(ip)
     instruction = chunk.code[ip]

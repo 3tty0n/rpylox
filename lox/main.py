@@ -6,7 +6,7 @@ from lox.chunk import Chunk
 from lox.opcodes import OpCode
 from lox.vm import VM, InterpretCompileError, InterpretRuntimeError
 
-from rpython.rlib import rfile
+from rpython.rlib import rfile, jit
 
 def test_chunk(argv):
     chunk = Chunk()
