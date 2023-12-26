@@ -1,4 +1,4 @@
-# Lox
+# RPyLox
 
 ## Progress
 
@@ -9,6 +9,6 @@
 - [x] Chapter 20
   - Skip this chapter because we can use built-in hash tables
 - [x] Chapter 21
-- [ ] Chapter 22
+- [x] Chapter 22
 - [ ] Chapter 23
 - [ ] Chapter 24
