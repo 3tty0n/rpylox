@@ -46,3 +46,17 @@ class ObjString(Obj):
 
      def hash(self):
           return compute_hash(self.buffer)
+
+
+class ObjFunction(Obj):
+     def __init__(self, obj, chunk, name):
+          self.obj = obj
+          self.arity = 0
+          self.chunk = chunk
+          self.name = name
+
+     def __repr__(self):
+          return self.repr()
+
+     def repr(self):
+          return "<fn %s>" % self.name

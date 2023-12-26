@@ -44,6 +44,7 @@ make targetlox-interp
 - [x] Chapter 22
 - [x] Chapter 23
 - [ ] Chapter 24
+  - Finished 24.1 (2023/12/27)
 - [ ] Chapter 25
 - [ ] Chapter 26
 - [ ] Chapter 27
