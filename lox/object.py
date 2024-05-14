@@ -2,6 +2,7 @@ from rpython.rlib.objectmodel import r_dict, compute_hash
 
 class ObjType:
      STRING = 0
+     FUNCTION = 1
 
 class Obj(object):
      def __init__(self, value_type):

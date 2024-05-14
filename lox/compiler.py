@@ -2,7 +2,7 @@ import math
 
 from lox.chunk import Chunk
 from lox.opcodes import OpCode
-from lox.object import ObjString
+from lox.object import ObjString, ObjFunction
 from lox.scanner import Scanner, TokenTypes, debug_token
 from lox.value import Value, ValueNumber, ValueBool, ValueObj
 
@@ -62,9 +62,13 @@ class Local(object):
     def get_token(self):
         return self.token
 
+class FunctionType(object):
+    FUNCTION = 0
+    SCRIPT = 1
+
 class Compiler(object):
 
-    def __init__(self, source, debug_print=False):
+    def __init__(self, source, function_type=FunctionType.SCRIPT, debug_print=False):
         self.source = source
         self.scanner = Scanner(source)
         self.parser = Parser()
@@ -75,6 +79,9 @@ class Compiler(object):
         self.local_variables = [None] * self._LOCAL_COUNT_MAX
         self.local_count = 0
         self.scope_depth = 0
+
+        self.function = None
+        self.type = type
 
     def compile(self):
         line = -1
@@ -122,9 +129,16 @@ class Compiler(object):
     def end_compiler(self):
         self.emit_return()
 
+        function = self.function
+
         if self.debug_print:
             if not self.parser.had_error:
-                self.current_chunk().disassemble("code")
+                output = "<script>"
+                if function.name:
+                    output = function.name
+                self.current_chunk().disassemble(output)
+
+        return function
 
     def _begin_scope(self):
         self.scope_depth += 1

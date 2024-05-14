@@ -2,18 +2,21 @@ from lox.compiler import Compiler
 from lox.opcodes import OpCode
 from lox.debug import disassemble_instruction, format_line_number, get_printable_location
 from lox.value import ValueNil, ValueNumber, ValueBool, ValueNil, ValueObj, Value
-from lox.object import ObjString, Obj
+from lox.object import ObjString, Obj, ObjFunction
 
 from rpython.rlib import jit
 from rpython.rlib.jit import JitDriver, we_are_translated
 
+
 jitdriver = JitDriver(greens=['ip', 'chunk',],
-                      reds=['stack_top', 'stack', 'self'],
+                      reds=['stack_top', 'stack', 'frame', 'self'],
                       get_printable_location=get_printable_location)
+
 
 def jitpolicy(driver):
     from rpython.jit.codewriter.policy import JitPolicy
     return JitPolicy()
+
 
 class InterpretResult:
     INTERPRET_OK = 0
@@ -29,22 +32,32 @@ class InterpretRuntimeError(RuntimeError):
     pass
 
 
+class CallFrame(object):
+    def __init__(self, function=None, ip=None, slots=None):
+        self.function = function
+        self.ip = ip
+        self.slots = slots
+
+
 class VM(object):
-    _immutable_fields_ = ['chunk', 'STACK_MAX_SIZE']
-
-    chunk = None
-    stack = None
-    stack_top = 0
-
-    ip = 0
+    _immutable_fields_ = ['chunk', 'STACK_MAX_SIZE', 'FRAMES_MAX']
 
     global_objects = {}
-
-    STACK_MAX_SIZE = 8
 
     def __init__(self, debug=True):
         self.debug_trace = debug
         self._reset_stack()
+
+        self.FRAMES_MAX = 64
+        self.frames = [CallFrame()] * self.FRAMES_MAX
+
+        self.chunk = None
+        self.stack = None
+        self.stack_top = 0
+
+        self.STACK_MAX_SIZE = 8
+
+        # self.ip = 0 # Moved to CallFrame
 
     def _reset_stack(self):
         self.stack = [None] * self.STACK_MAX_SIZE
@@ -93,31 +106,34 @@ class VM(object):
         print "%s\n[line %s] in script" % (message, line_number)
         self._reset()
 
-    def interpret_chunk(self, chunk):
-        self.chunk = chunk
-        self.ip = 0
-        return self.run()
+    # def interpret_chunk(self, chunk):
+    #     self.chunk = chunk
+    #     self.ip = 0
+    #     return self.run()
 
     def interpret(self, source):
         self._reset()
 
         compiler = Compiler(source, debug_print=self.debug_trace)
-        if compiler.compile():
-            return self.interpret_chunk(compiler.current_chunk())
+        function = compiler.compile()
+        if function:
+            self._push_stack(ValueObj(function))
+            frame = CallFrame(function, 0, self.stack[:])
+            return self.run(frame)
         else:
             return InterpretResult.INTERPRET_COMPILE_ERROR
 
-    def run(self):
+    def run(self, frame):
         instruction = None
         while True:
             if not we_are_translated():
                 if self.debug_trace:
-                    disassemble_instruction(self.chunk, self.ip)
+                    disassemble_instruction(frame.chunk, frame.ip)
                     self._trace_stack()
 
-            jitdriver.jit_merge_point(ip=self.ip, chunk=self.chunk,
+            jitdriver.jit_merge_point(ip=frame.ip, chunk=frame.chunk,
                                       stack=self.stack, stack_top=self.stack_top,
-                                      self=self)
+                                      frame=frame, self=self)
 
             instruction = self._read_byte()
             if instruction == OpCode.OP_RETURN:
@@ -188,43 +204,45 @@ class VM(object):
                 self._push_stack(ValueNil()) # To handle with OP_POP
             elif instruction == OpCode.OP_GET_LOCAL:
                 slot = self._read_byte()
-                self._push_stack(self.stack[slot])
+                self._push_stack(self.frame.slots[slot])
             elif instruction == OpCode.OP_SET_LOCAL:
                 slot = self._read_byte()
-                self.stack[slot] = self._peek_stack(0)
+                self.frame.slots[slot] = self._peek_stack(0)
             elif instruction == OpCode.OP_JUMP_IF_FALSE:
                 offset = self._read_short()
                 if self._peek_stack(0).is_falsy():
-                    self.ip += offset
+                    self.frame.ip += offset
             elif instruction == OpCode.OP_JUMP:
                 offset = self._read_short()
-                self.ip += offset
+                self.frame.ip += offset
             elif instruction == OpCode.OP_LOOP: # backward jump
                 offset = self._read_short()
-                self.ip -= offset
+                self.frame.ip -= offset
                 jitdriver.can_enter_jit(ip=self.ip, chunk=self.chunk,
                                         stack=self.stack, stack_top=self.stack_top,
-                                        self=self)
+                                        frame=frame, self=self)
             else:
                 print "Unknown opcode"
                 raise InterpretRuntimeError()
 
     def _read_byte(self):
-        jit.promote(self.chunk)
-        instruction = self.chunk.code[self.ip]
-        self.ip += 1
+        chunk = self.frame.function.chunk
+        jit.promote(chunk)
+        instruction = chunk.code[self.frame.ip]
+        self.frame.ip += 1
         return instruction
 
     def _read_short(self):
-        jit.promote(self.chunk)
-        offset1 = self.chunk.code[self.ip]
-        offset2 = self.chunk.code[self.ip + 1]
-        self.ip += 2
+        chunk = self.frame.function.chunk
+        jit.promote(chunk)
+        offset1 = chunk.code[self.frame.ip]
+        offset2 = chunk.code[self.frame.ip + 1]
+        self.frame.ip += 2
         return offset1 << 8 | offset2
 
     def _read_constant(self):
         constant_index = self._read_byte()
-        return self.chunk.constants[constant_index]
+        return self.frame.function.chunk.constants[constant_index]
 
     def _read_string(self):
         w_const = self._read_constant()
