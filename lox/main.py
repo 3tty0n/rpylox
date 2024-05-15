@@ -68,7 +68,7 @@ def run_file(filename):
         print "Compile error"
         raise e
     except InterpretRuntimeError as e:
-        print "RUntime error"
+        print "Runtime error"
         raise e
     except ValueError:
         print "Unhandled exception in runFile"
