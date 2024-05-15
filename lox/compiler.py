@@ -2,7 +2,7 @@ import math
 
 from lox.chunk import Chunk
 from lox.opcodes import OpCode
-from lox.object import ObjString, ObjFunction
+from lox.object import ObjString, ObjFunction, ObjType
 from lox.scanner import Scanner, TokenTypes, debug_token
 from lox.value import Value, ValueNumber, ValueBool, ValueObj
 
@@ -66,13 +66,20 @@ class FunctionType(object):
     FUNCTION = 0
     SCRIPT = 1
 
+class CurrentFunction(object):
+    def __init__(self, function, name, arity):
+        self.function = function
+        self.name = name
+        self.arity = arity
+
 class Compiler(object):
 
-    def __init__(self, source, function_type=FunctionType.SCRIPT, debug_print=False):
+    def __init__(self, source, type=FunctionType.SCRIPT, debug_print=False):
         self.source = source
         self.scanner = Scanner(source)
         self.parser = Parser()
         self.chunk = Chunk()
+        self.type = type
         self.debug_print = debug_print
 
         self._LOCAL_COUNT_MAX = 16
@@ -80,8 +87,13 @@ class Compiler(object):
         self.local_count = 0
         self.scope_depth = 0
 
-        self.function = None
-        self.type = type
+        self.this_function = ObjFunction()
+
+    def new_compiler(self, type):
+        compiler = Compiler(self.source, type, self.debug_print)
+        compiler.scanner = self.scanner
+        compiler.parser = self.parser
+        return compiler
 
     def compile(self):
         line = -1
@@ -93,9 +105,10 @@ class Compiler(object):
         while not self.match(TokenTypes.EOF):
             self.declaration()
 
-        self.end_compiler()
+        function = self.end_compiler()
 
-        return not self.parser.had_error
+        if not self.parser.had_error:
+            return function
 
     def advance(self):
         self.parser.previous = self.parser.current
@@ -126,17 +139,16 @@ class Compiler(object):
     def _check(self, token_type):
         return self.parser.current.type == token_type
 
-    def end_compiler(self):
+    def end_compiler(self, func_name="<script>", func_arity=None):
         self.emit_return()
 
-        function = self.function
+        function = ObjFunction(chunk=self.current_chunk(),
+                               name=func_name,
+                               arity=func_arity)
 
         if self.debug_print:
             if not self.parser.had_error:
-                output = "<script>"
-                if function.name:
-                    output = function.name
-                self.current_chunk().disassemble(output)
+                self.current_chunk().disassemble(func_name)
 
         return function
 
@@ -238,6 +250,10 @@ class Compiler(object):
         if op_type == TokenTypes.LESS_EQUAL:
             self.emit_bytes(OpCode.OP_GREATER, OpCode.OP_NEGATE)
 
+    def call(self, can_assign):
+        arg_count = self._argument_list()
+        self.emit_bytes(OpCode.OP_CALL, arg_count)
+
     def and_(self, can_assign):
         end_jump = self.emit_jump(OpCode.OP_JUMP_IF_FALSE)
 
@@ -327,6 +343,8 @@ class Compiler(object):
         return self._identifier_constant(name)
 
     def _mark_initialized(self):
+        if self.scope_depth == 0:
+            return
         self.local_variables[self.local_count - 1].set_depth(self.scope_depth)
 
     def _define_variable(self, global_var):
@@ -334,6 +352,19 @@ class Compiler(object):
             self._mark_initialized()
             return
         self.emit_bytes(OpCode.OP_DEFINE_GLOBAL, global_var)
+
+    def _argument_list(self):
+        arg_count = 0
+        while not self._check(TokenTypes.RIGHT_PAREN):
+            self.expression()
+            arg_count += 1
+            if arg_count == 255:
+                self._error("Can't have more than 255 arguments.")
+            if self._check(TokenTypes.COMMA):
+                self.advance()
+
+        self.consume(TokenTypes.RIGHT_PAREN, "Expect ')' after arguments.")
+        return arg_count
 
     def expression(self):
         self.parse_precedence(Precedence.ASSIGNMENT)
@@ -343,6 +374,40 @@ class Compiler(object):
             self.declaration()
 
         self.consume(TokenTypes.RIGHT_BRACE, "Expect '}' after block.")
+
+    def function(self, type):
+        compiler = self.new_compiler(type)
+
+        name = compiler.scanner.get_token_string(compiler.parser.previous)
+        compiler._begin_scope()
+
+        compiler.consume(TokenTypes.LEFT_PAREN, "Expect '(' after function name.")
+
+        arity = 0
+        while not compiler._check(TokenTypes.RIGHT_PAREN):
+            arity += 1
+            if arity > 255:
+                compiler._error_at_current("Can't have more than 255 parameters.")
+            constant = compiler._parse_variable("Excpect parameter name.")
+            compiler._define_variable(constant)
+            if compiler._check(TokenTypes.COMMA):
+                compiler.advance()
+
+        compiler.consume(TokenTypes.RIGHT_PAREN, "Expect ')' after function name.")
+        compiler.consume(TokenTypes.LEFT_BRACE, "Expect '{' after function name.")
+        compiler.block()
+
+        function = compiler.end_compiler(func_name=name, func_arity=arity)
+        self.emit_bytes(
+            OpCode.OP_CONSTANT,
+            self._make_constant(ValueObj(function))
+        )
+
+    def fun_declaration(self):
+        global_name = self._parse_variable("Expect function name.")
+        self._mark_initialized()
+        self.function(ObjType.FUNCTION)
+        self._define_variable(global_name)
 
     def var_declaration(self):
         global_var = self._parse_variable("Expect variable name.")
@@ -463,7 +528,9 @@ class Compiler(object):
 
     def declaration(self):
 
-        if self.match(TokenTypes.VAR):
+        if self.match(TokenTypes.FUN):
+            self.fun_declaration()
+        elif self.match(TokenTypes.VAR):
             self.var_declaration()
         else:
             self.statement()
@@ -577,7 +644,7 @@ class Compiler(object):
 # The table that drives our whole parser. Entries per token of:
 # [ prefix, infix, precedence]
 rules = [
-    ParseRule(Compiler.grouping,    None,               Precedence.CALL),        # TOKEN_LEFT_PAREN
+    ParseRule(Compiler.grouping,    Compiler.call,      Precedence.CALL),        # TOKEN_LEFT_PAREN
     ParseRule(None,                 None,               Precedence.NONE),        # TOKEN_RIGHT_PAREN
     ParseRule(None,                 None,               Precedence.NONE),        # TOKEN_LEFT_BRACE
     ParseRule(None,                 None,               Precedence.NONE),        # TOKEN_RIGHT_BRACE

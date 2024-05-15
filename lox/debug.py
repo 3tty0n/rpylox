@@ -101,7 +101,9 @@ def format_instruction_extended(chunk, instruction, instruction_name, offset):
             OpCode.OP_SET_LOCAL,
             OpCode.OP_GET_LOCAL,
             OpCode.OP_GET_GLOBAL,
-            OpCode.OP_SET_GLOBAL
+            OpCode.OP_SET_GLOBAL,
+            OpCode.OP_CALL,
+            OpCode.OP_DEFINE_GLOBAL,
     ):
         repr, ip = byte_instruction(instruction_name, chunk, offset)
     elif instruction in (

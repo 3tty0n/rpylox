@@ -25,6 +25,7 @@ class OpCode:
     OP_SET_GLOBAL = OP_GET_GLOBAL + 1
     OP_GET_LOCAL = OP_SET_GLOBAL + 1
     OP_SET_LOCAL = OP_GET_LOCAL + 1
+    OP_CALL = OP_SET_LOCAL + 1
 
     BinaryOps = [
         OP_ADD,

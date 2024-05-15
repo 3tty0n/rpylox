@@ -50,9 +50,8 @@ class ObjString(Obj):
 
 
 class ObjFunction(Obj):
-     def __init__(self, obj, chunk, name):
-          self.obj = obj
-          self.arity = 0
+     def __init__(self, chunk=None, name=None, arity=0):
+          self.arity = arity
           self.chunk = chunk
           self.name = name
 
