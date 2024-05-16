@@ -66,12 +66,6 @@ class FunctionType(object):
     FUNCTION = 0
     SCRIPT = 1
 
-class CurrentFunction(object):
-    def __init__(self, function, name, arity):
-        self.function = function
-        self.name = name
-        self.arity = arity
-
 class Compiler(object):
 
     def __init__(self, source, type=FunctionType.SCRIPT, debug_print=False):
@@ -86,8 +80,6 @@ class Compiler(object):
         self.local_variables = [None] * self._LOCAL_COUNT_MAX
         self.local_count = 0
         self.scope_depth = 0
-
-        self.this_function = ObjFunction()
 
     def new_compiler(self, type):
         compiler = Compiler(self.source, type, self.debug_print)
