@@ -131,7 +131,7 @@ class Compiler(object):
     def _check(self, token_type):
         return self.parser.current.type == token_type
 
-    def end_compiler(self, func_name="<script>", func_arity=None):
+    def end_compiler(self, func_name="<script>", func_arity=0):
         self.emit_return()
 
         function = ObjFunction(chunk=self.current_chunk(),

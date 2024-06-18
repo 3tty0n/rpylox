@@ -5,7 +5,7 @@ from lox.value import ValueNil, ValueNumber, ValueBool, ValueNil, ValueObj, Valu
 from lox.object import ObjString, Obj, ObjFunction
 
 from rpython.rlib import jit
-from rpython.rlib.jit import JitDriver, we_are_translated, we_are_jitted
+from rpython.rlib.jit import JitDriver, we_are_translated, we_are_jitted, promote
 
 
 jitdriver = JitDriver(greens=['ip', 'chunk',],
@@ -63,11 +63,11 @@ class VM(object):
         self.debug_trace = debug
         self._reset_stack()
 
-        # self.FRAMES_MAX = 64
-        # self.frames = [None] * self.FRAMES_MAX
+        self.FRAMES_MAX = 64
+        self.frames = [None] * self.FRAMES_MAX
 
         self.chunk = None
-        self.stack = None
+        self.stack = [None] * self.STACK_MAX_SIZE
         self.stack_top = 0
 
         self.frames = [None] * self.FRAMES_MAX
@@ -190,7 +190,7 @@ class VM(object):
             jitdriver.jit_merge_point(ip=self.frame.ip, chunk=self.frame.function.chunk,
                                       stack=self.stack, stack_top=self.stack_top,
                                       frame=self.frame, self=self)
-
+            promote(self.stack_top)
             instruction = self._read_byte()
             if instruction == OpCode.OP_RETURN:
                 return InterpretResult.INTERPRET_OK
@@ -248,7 +248,7 @@ class VM(object):
             elif instruction == OpCode.OP_LOOP: # backward jump
                 offset = self._read_short()
                 self.frame.ip -= offset
-                jitdriver.can_enter_jit(ip=self.ip, chunk=self.chunk,
+                jitdriver.can_enter_jit(ip=self.frame.ip, chunk=self.frame.function.chunk,
                                         stack=self.stack, stack_top=self.stack_top,
                                         frame=self.frame, self=self)
             elif instruction == OpCode.OP_CALL:
@@ -284,7 +284,7 @@ class VM(object):
         elif op == "*":
             self._push_stack(w_x.mul(w_y))
         elif op == "/":
-            self._push_stackt(w_x.div(w_y))
+            self._push_stack(w_x.div(w_y))
         elif op == "<":
             w_z = ValueBool(w_x.as_number() < w_y.as_number())
             self._push_stack(w_z)
@@ -313,8 +313,10 @@ class VM(object):
         return False
 
     def _call(self, function, arg_count):
+        i = self.stack_top - (arg_count + 1)
+        assert not i < 0
         new_frame = CallFrame(function, ip=0,
-                              slots=self.stack[self.stack_top - (arg_count + 1):][:])
+                              slots=self.stack[i:][:])
         self.frame = new_frame
         self.stack = new_frame.slots[:]
         self.stack_top = arg_count + 1
