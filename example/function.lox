@@ -1,0 +1,13 @@
+fun f(n, m) {
+    var w = n + m;
+    var x = 1;
+    var y = 2;
+    var z = x + y;
+    print z + w;
+}
+
+fun g(l) {
+    print l;
+}
+
+print f(3, 4);
