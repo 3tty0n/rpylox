@@ -1,6 +1,6 @@
 # RPyLox
 
-This repository is a RPython implementation for Lox. Read more at https://craftinginterpreters.com/
+This repository is an RPython implementation for Lox. Read more at https://craftinginterpreters.com/
 
 ## Prerequisite
 
@@ -19,13 +19,13 @@ PyPy 2.7 is based on Python 2.7. Please install Python 2.7 instead of Python 3.x
 
 You can use `Makefile` to build `rlox-jit` and `rlox-interp`.
 
-`rlox-jit` support meta-tracing compialtion and runs faster for loop-heavy programs for example.
+`rlox-jit` supports meta-tracing compialtion and runs faster for loop-heavy programs for example.
 
 ```shell
 make targetlox-jit
 ```
 
-`rlox-interp` is an interpreter compiled by using RPython.
+`rlox-interp` is an interpreter compiled by RPython.
 
 ```shell
 make targetlox-interp
